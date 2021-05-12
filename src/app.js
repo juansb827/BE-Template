@@ -81,4 +81,82 @@ app.get('/jobs/unpaid', getProfile, async (req, res) => {
     res.json(jobs)
 })
 
+
+
+/**
+ * Pay for a job 
+ */
+app.post('/jobs/:id/pay', getProfile, async (req, res) => {
+    const { Job, Contract, Profile } = req.app.get('models')
+    const { id } = req.params
+    const { id: profileId } = req.profile;
+    const t = await sequelize.transaction();
+    const job = await Job.findOne({
+        where: {
+            id
+        },
+        include: [
+            {
+                model: Contract,
+                required: true,
+                where: {
+                    [Op.or]: [
+                        { ClientId: profileId },
+                    ]
+                }
+            }
+        ],
+        transaction: t
+    })
+    if (!job) return res.status(404).end()
+
+    const client = await Profile.findOne({ where: { id: profileId }, transaction: t })
+    const contractorId = job.Contract.ContractorId;
+    const contractor = await Profile.findOne({ where: { id: contractorId }, transaction: t })
+
+    const clientBalance = client.balance;
+    const contractorBalance = contractor.balance;
+
+    // validations
+    let message;
+    if (job.paid) {
+        message = message || 'Job is already paid'
+    }
+
+    if (job.Contract.status !== 'in_progress') {
+        message = message || 'Contract is not active'
+    }
+
+    if (clientBalance < job.price) {
+        message = message || 'Balance is not enough to pay for the job'
+    }
+
+    if (message) {
+        t.rollback();
+        return res.status(400).send({
+            message
+        })
+    }
+
+    // balance update   
+    const newClientBalance = clientBalance - job.price
+    const newContractorBalance = contractorBalance + job.price
+
+    client.set({
+        balance: newClientBalance
+    })
+    await client.save({ transaction: t })
+
+    contractor.set({
+        balance: newContractorBalance
+    })
+    await contractor.save({ transaction: t })
+
+    job.set({ paid: true })
+    await job.save({ transaction: t })
+
+    await t.commit();
+    return res.status(200).end()
+});
+
 module.exports = app;
