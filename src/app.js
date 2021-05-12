@@ -30,4 +30,27 @@ app.get('/contracts/:id', getProfile, async (req, res) => {
     if (!contract) return res.status(404).end()
     res.json(contract)
 })
+
+
+/**
+ * @returns all contracts from a profile
+ */
+app.get('/contracts', getProfile, async (req, res) => {
+    const { Contract } = req.app.get('models')
+    const { id: profileId} = req.profile;
+
+    const contracts = await Contract.findAll({
+        where: {
+            status: {  [Op.not]: 'terminated' },
+            [Op.or]: [
+                { ClientId: profileId },
+                { ContractorId: profileId },
+            ]
+        }
+    })
+
+    if (!contracts) return res.status(404).end()
+    res.json(contracts)
+})
+
 module.exports = app;
