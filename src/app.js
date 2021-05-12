@@ -159,4 +159,89 @@ app.post('/jobs/:id/pay', getProfile, async (req, res) => {
     return res.status(200).end()
 });
 
+
+/**
+ * Transfer balance between clients
+ */
+app.post('/balances/deposit/:userId', getProfile, async (req, res) => {
+    const { Job, Contract, Profile } = req.app.get('models')
+    const { userId: destinationProfileId } = req.params
+    const { id: sourceProfileId } = req.profile;
+    const { amount } = req.body;
+
+    const t = await sequelize.transaction();
+
+    const sourceClient = await Profile.findOne({ where: { id: sourceProfileId }, transaction: t })
+    const destinationClient = await Profile.findOne({ where: { id: destinationProfileId }, transaction: t })
+
+    if (!destinationClient) return res.status(404).end()
+
+    const sourceBalance = sourceClient.balance;
+    const destinationBalance = destinationClient.balance;
+
+    const totalJobsToPay = await Job.sum('price', {
+        where: {
+            paid: { [Op.not]: true },
+        },
+        include: [
+            {
+                model: Contract,
+                required: true,
+                where: {
+                    status: 'in_progress',
+                    [Op.or]: [
+                        { ClientId: sourceProfileId },
+                    ]
+                }
+            }
+        ],
+        raw: true,
+        transaction: t
+    })
+
+    // validations
+    let message;
+
+    if (Number(sourceProfileId) === Number(destinationProfileId)) {
+        message = message || 'User cannot deposit itself'
+    }
+
+    if (sourceClient.type !== 'client' || destinationClient.type !== 'client') {
+        message = message || 'Only clients can send/receive deposit'
+    }
+
+    if (amount > totalJobsToPay * 0.25) {
+        message = message || 'Deposit cannot be above 25% of total of jobs to pay'
+    }
+
+    if (amount > sourceBalance) {
+        message = message || 'Not enough balance'
+    }
+
+    if (message) {
+        t.rollback();
+        return res.status(400).send({
+            message
+        })
+    }
+
+    // balance update   
+    const newSourceBalance = sourceBalance - amount
+    const newDestinationBalance = destinationBalance + amount
+
+    sourceClient.set({
+        balance: newSourceBalance
+    })
+    await sourceClient.save({ transaction: t })
+
+    destinationClient.set({
+        balance: newDestinationBalance
+    })
+    await destinationClient.save({ transaction: t })
+
+    await t.commit();
+    return res.status(200).end()
+
+});
+
 module.exports = app;
