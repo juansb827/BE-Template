@@ -299,4 +299,65 @@ app.get('/admin/best-profession', getProfile, async (req, res) => {
         total_earnings: total_earnings || 0
     })
 })
+
+/**
+ * @returns - clients that have paid the most on jobs
+ */
+app.get('/admin/best-clients', getProfile, async (req, res) => {
+    const { Profile, Contract, Job } = req.app.get('models')
+
+    // expects yyyy-MM-dd
+    const { start, end} = req.query;
+
+    const startDate = new Date(Date.parse(start));
+    const endDate = new Date(Date.parse(end));
+    let limit = req.query.limit || 2;
+
+
+
+    if (isNaN(startDate) || isNaN(endDate)) {
+        return res.status(400).send({
+            message: 'Invalid date range'
+        })
+    }
+
+    // TODO: use SQL limit
+    let bestClient = await Profile.findAll({
+        attributes: ['id', 'firstName', 'lastName' ,[sequelize.fn('sum',sequelize.col('price')), 'paid']],
+        where: {
+            type: 'client'
+        },
+        include: [
+            {
+                model: Contract,
+                as: 'Client',
+                attributes: [],
+                include: {
+                    model: Job,
+                    attributes: ['price'],
+                    where: {
+                        paymentDate: {
+                            [Op.between] : [startDate , endDate ]
+                        }
+                    }
+                }
+            }
+        ],
+        raw: true,
+        group: ['Profile.profession'],
+        order: [[sequelize.col('paid'), 'DESC']],
+    })
+
+    if (!bestClient || !bestClient.length) return res.json([])
+    bestClient = bestClient.slice(0, limit);
+    const ans = bestClient.map(({ id, paid, firstName, lastName }) => ({
+        id,
+        paid: paid || 0,
+        fullName: `${firstName} ${lastName}`
+    }));
+    return res.json(ans)
+})
+
 module.exports = app;
+
+
