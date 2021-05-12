@@ -244,4 +244,59 @@ app.post('/balances/deposit/:userId', getProfile, async (req, res) => {
 
 });
 
+/**
+ * @returns - best payed profession within a time range
+ */
+app.get('/admin/best-profession', getProfile, async (req, res) => {
+    const { Profile, Contract, Job } = req.app.get('models')
+
+    // expects yyyy-MM-dd
+    const { start, end } = req.query;
+
+    const startDate = new Date(Date.parse(start));
+    const endDate = new Date(Date.parse(end));
+
+
+
+    if (isNaN(startDate) || isNaN(endDate)) {
+        return res.status(400).send({
+            message: 'Invalid date range'
+        })
+    }
+   
+    // TODO: useFindOne
+    const bestProfession = await Profile.findAll({
+        attributes: ['profession', [sequelize.fn('sum',sequelize.col('price')), 'total_earnings']],
+        where: {
+            type: 'contractor'
+        },
+        include: [
+            {
+                model: Contract,
+                as: 'Contractor',
+                attributes: [],
+                include: {
+                    model: Job,
+                    attributes: ['price'],
+                    where: {
+                        paymentDate: {
+                            [Op.between] : [startDate , endDate ]
+                        }
+                    }
+                }
+            }
+        ],
+        raw: true,
+        group: ['Profile.profession'],
+        order: [[sequelize.col('total_earnings'), 'DESC']],
+    })
+
+    if (!bestProfession || !bestProfession.length) return res.json([])
+    const { profession, total_earnings} = bestProfession[0];
+    
+    return res.json({
+        profession,
+        total_earnings: total_earnings || 0
+    })
+})
 module.exports = app;
