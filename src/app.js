@@ -67,6 +67,7 @@ app.get('/jobs/unpaid', getProfile, async (req, res) => {
             {
                 model: Contract,
                 required: true,
+                attributes: [],
                 where: {
                     status: 'in_progress',
                     [Op.or]: [
@@ -108,7 +109,10 @@ app.post('/jobs/:id/pay', getProfile, async (req, res) => {
         ],
         transaction: t
     })
-    if (!job) return res.status(404).end()
+    if (!job) {
+        await t.rollback();
+        return res.status(404).end()
+    }
 
     const client = await Profile.findOne({ where: { id: profileId }, transaction: t })
     const contractorId = job.Contract.ContractorId;
@@ -174,7 +178,10 @@ app.post('/balances/deposit/:userId', getProfile, async (req, res) => {
     const sourceClient = await Profile.findOne({ where: { id: sourceProfileId }, transaction: t })
     const destinationClient = await Profile.findOne({ where: { id: destinationProfileId }, transaction: t })
 
-    if (!destinationClient) return res.status(404).end()
+    if (!destinationClient) {
+        await t.rollback();
+        return res.status(404).end()
+    }
 
     const sourceBalance = sourceClient.balance;
     const destinationBalance = destinationClient.balance;
@@ -263,10 +270,10 @@ app.get('/admin/best-profession', getProfile, async (req, res) => {
             message: 'Invalid date range'
         })
     }
-   
+
     // TODO: useFindOne
     const bestProfession = await Profile.findAll({
-        attributes: ['profession', [sequelize.fn('sum',sequelize.col('price')), 'total_earnings']],
+        attributes: ['profession', [sequelize.fn('sum', sequelize.col('price')), 'total_earnings']],
         where: {
             type: 'contractor'
         },
@@ -280,7 +287,7 @@ app.get('/admin/best-profession', getProfile, async (req, res) => {
                     attributes: ['price'],
                     where: {
                         paymentDate: {
-                            [Op.between] : [startDate , endDate ]
+                            [Op.between]: [startDate, endDate]
                         }
                     }
                 }
@@ -292,8 +299,8 @@ app.get('/admin/best-profession', getProfile, async (req, res) => {
     })
 
     if (!bestProfession || !bestProfession.length) return res.json([])
-    const { profession, total_earnings} = bestProfession[0];
-    
+    const { profession, total_earnings } = bestProfession[0];
+
     return res.json({
         profession,
         total_earnings: total_earnings || 0
@@ -307,7 +314,7 @@ app.get('/admin/best-clients', getProfile, async (req, res) => {
     const { Profile, Contract, Job } = req.app.get('models')
 
     // expects yyyy-MM-dd
-    const { start, end} = req.query;
+    const { start, end } = req.query;
 
     const startDate = new Date(Date.parse(start));
     const endDate = new Date(Date.parse(end));
@@ -323,7 +330,7 @@ app.get('/admin/best-clients', getProfile, async (req, res) => {
 
     // TODO: use SQL limit
     let bestClient = await Profile.findAll({
-        attributes: ['id', 'firstName', 'lastName' ,[sequelize.fn('sum',sequelize.col('price')), 'paid']],
+        attributes: ['id', 'firstName', 'lastName', [sequelize.fn('sum', sequelize.col('price')), 'paid']],
         where: {
             type: 'client'
         },
@@ -337,7 +344,7 @@ app.get('/admin/best-clients', getProfile, async (req, res) => {
                     attributes: ['price'],
                     where: {
                         paymentDate: {
-                            [Op.between] : [startDate , endDate ]
+                            [Op.between]: [startDate, endDate]
                         }
                     }
                 }

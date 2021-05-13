@@ -1,16 +1,18 @@
 const supertest = require('supertest')
 const app = require('../src/app');
 
-describe('Contracts', () => {
+describe('Jobs', () => {
     let request;
 
     beforeEach(() => {
         request = supertest.agent(app).set({ 'profile_id': '1' })
     })
 
-    beforeAll(() => { })
+    beforeAll(async () => {
+        await require('../scripts/seedDb.js')
+    })
 
-    describe('GET /contracts/:id', () => {
+    describe('GET /jobs/unpaid', () => {
 
         describe('when contract does NOT exist', () => {
 
@@ -45,8 +47,6 @@ describe('Contracts', () => {
                         "id": 2,
                         "terms": "bla bla bla",
                         "status": "in_progress",
-                        "createdAt": "2021-05-12T20:43:48.529Z",
-                        "updatedAt": "2021-05-12T20:43:48.529Z",
                         "ContractorId": 6,
                         "ClientId": 1
                     }
@@ -68,8 +68,6 @@ describe('Contracts', () => {
                         "id": 2,
                         "terms": "bla bla bla",
                         "status": "in_progress",
-                        "createdAt": "2021-05-12T20:43:48.529Z",
-                        "updatedAt": "2021-05-12T20:43:48.529Z",
                         "ContractorId": 6,
                         "ClientId": 1
                     }

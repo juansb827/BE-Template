@@ -1,7 +1,7 @@
 const { Profile, Contract, Job } = require('../src/model');
 
 /* WARNING THIS WILL DROP THE CURRENT DATABASE */
-seed();
+module.exports = seed();
 
 async function seed() {
   // create tables
