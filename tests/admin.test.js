@@ -15,7 +15,7 @@ describe('Admin', () => {
 
     describe('GET /admin/best-profession', () => {
 
-        it('should return the most payed profession within the given time range', async () => {
+        it('should return the most paid profession within the given time range', async () => {
             const res = await request
                 .get('/admin/best-profession?start=2020-08-14&end=2020-08-19')
                 .send()

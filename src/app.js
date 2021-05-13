@@ -252,7 +252,7 @@ app.post('/balances/deposit/:userId', getProfile, async (req, res) => {
 });
 
 /**
- * @returns - best payed profession within a time range
+ * @returns - best paid profession within a time range
  */
 app.get('/admin/best-profession', getProfile, async (req, res) => {
     const { Profile, Contract, Job } = req.app.get('models')
